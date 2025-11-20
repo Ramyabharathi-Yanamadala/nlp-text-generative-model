@@ -1,0 +1,82 @@
+# =========================================
+# 🧠 Generative Text Model (LSTM Demo)
+# =========================================
+
+# 1️⃣ Install & Import Libraries
+!pip install -q tensorflow
+import numpy as np, tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+
+print("✅ Libraries ready!")
+
+# 2️⃣ Tiny Demo Dataset
+corpus = [
+    "Artificial intelligence is transforming industries.",
+    "Climate change impacts every living creature.",
+    "Healthy food keeps the body and mind balanced.",
+    "Space exploration expands human understanding.",
+]
+text = " ".join(corpus).lower()
+print("Total characters:", len(text))
+
+# 3️⃣ Character Mapping
+chars = sorted(list(set(text)))
+char2idx = {c: i for i, c in enumerate(chars)}
+idx2char = {i: c for c, i in char2idx.items()}
+vocab_size = len(chars)
+print("Vocab size:", vocab_size)
+
+# 4️⃣ Prepare Training Sequences
+seq_length = 30
+step = 3
+sentences, next_chars = [], []
+for i in range(0, len(text) - seq_length, step):
+    sentences.append(text[i: i + seq_length])
+    next_chars.append(text[i + seq_length])
+
+X = np.zeros((len(sentences), seq_length, vocab_size), dtype=bool)
+y = np.zeros((len(sentences), vocab_size), dtype=bool)
+for i, sentence in enumerate(sentences):
+    for t, char in enumerate(sentence):
+        X[i, t, char2idx[char]] = 1
+    y[i, char2idx[next_chars[i]]] = 1
+print("Training samples:", len(X))
+
+# 5️⃣ Build Model
+model = Sequential([
+    LSTM(128, input_shape=(seq_length, vocab_size)),
+    Dropout(0.2),
+    Dense(vocab_size, activation="softmax"),
+])
+model.compile(loss="categorical_crossentropy", optimizer=Adam(0.005))
+model.summary()
+
+# 6️⃣ Train Quickly
+history = model.fit(X, y, batch_size=64, epochs=5)
+
+# 7️⃣ Helper Function to Generate Text
+def sample(preds, temperature=1.0):
+    preds = np.asarray(preds).astype("float64")
+    preds = np.log(preds + 1e-8) / temperature
+    exp_preds = np.exp(preds)
+    preds = exp_preds / np.sum(exp_preds)
+    return np.random.choice(range(len(preds)), p=preds)
+
+def generate_text(seed="artificial", length=300, temperature=0.7):
+    generated = seed.lower()
+    for _ in range(length):
+        x_pred = np.zeros((1, seq_length, vocab_size))
+        for t, char in enumerate(generated[-seq_length:]):
+            if char in char2idx:
+                x_pred[0, t, char2idx[char]] = 1
+        preds = model.predict(x_pred, verbose=0)[0]
+        next_idx = sample(preds, temperature)
+        generated += idx2char[next_idx]
+    return generated
+
+# 8️⃣ Try Generating Text
+seed = "artificial intelligence"
+print("\n📝 Generated Text:\n")
+print(generate_text(seed, length=300, temperature=0.6))
